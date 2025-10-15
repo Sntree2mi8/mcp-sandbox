@@ -1,0 +1,17 @@
+# Environment variables
+.env
+
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Output of the go coverage tools
+*.out
+
+# Go workspace file
+go.work
