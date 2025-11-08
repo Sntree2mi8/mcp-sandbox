@@ -4,12 +4,18 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/slack-go/slack"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/slack-go/slack"
+)
+
+const (
+	// MaxFileSize is the maximum allowed file size in bytes (10MB)
+	MaxFileSize = 10 * 1024 * 1024
 )
 
 type UploadImageTool struct {
@@ -57,6 +63,20 @@ func validateImageContent(content []byte) error {
 	if !strings.HasPrefix(contentType, "image/") {
 		return fmt.Errorf("file is not an image: detected content type is %s", contentType)
 	}
+	return nil
+}
+
+// validateFileSize checks if the file size is within the allowed limit
+func validateFileSize(filePath string) error {
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	if fileInfo.Size() > MaxFileSize {
+		return fmt.Errorf("file too large: %d bytes (max: %d bytes)", fileInfo.Size(), MaxFileSize)
+	}
+
 	return nil
 }
 
@@ -113,6 +133,11 @@ func (t *UploadImageTool) UploadImage(ctx context.Context, _ *mcp.CallToolReques
 
 	// Validate file path is within allowed directories
 	if err := validateFilePath(input.FilePath, t.allowedDirs); err != nil {
+		return nil, UploadImageOutput{}, err
+	}
+
+	// Validate file size before reading into memory
+	if err := validateFileSize(input.FilePath); err != nil {
 		return nil, UploadImageOutput{}, err
 	}
 

@@ -145,6 +145,82 @@ func TestValidateImageContent(t *testing.T) {
 	}
 }
 
+func TestValidateFileSize(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir := t.TempDir()
+
+	// Create a small file (within limit)
+	smallFile := filepath.Join(tempDir, "small.txt")
+	smallContent := make([]byte, 1024) // 1KB
+	if err := os.WriteFile(smallFile, smallContent, 0644); err != nil {
+		t.Fatalf("failed to create small test file: %v", err)
+	}
+
+	// Create a large file (over limit)
+	largeFile := filepath.Join(tempDir, "large.txt")
+	largeContent := make([]byte, MaxFileSize+1) // Just over the limit
+	if err := os.WriteFile(largeFile, largeContent, 0644); err != nil {
+		t.Fatalf("failed to create large test file: %v", err)
+	}
+
+	// Create a file exactly at the limit
+	exactFile := filepath.Join(tempDir, "exact.txt")
+	exactContent := make([]byte, MaxFileSize) // Exactly at the limit
+	if err := os.WriteFile(exactFile, exactContent, 0644); err != nil {
+		t.Fatalf("failed to create exact size test file: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		filePath    string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:     "small file within limit",
+			filePath: smallFile,
+			wantErr:  false,
+		},
+		{
+			name:     "file exactly at limit",
+			filePath: exactFile,
+			wantErr:  false,
+		},
+		{
+			name:        "file over limit",
+			filePath:    largeFile,
+			wantErr:     true,
+			errContains: "file too large",
+		},
+		{
+			name:        "non-existent file",
+			filePath:    filepath.Join(tempDir, "nonexistent.txt"),
+			wantErr:     true,
+			errContains: "failed to stat file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateFileSize(tt.filePath)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("validateFileSize() expected error but got nil for file %s", tt.filePath)
+					return
+				}
+				if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
+					t.Errorf("validateFileSize() error = %v, want error containing %q", err, tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("validateFileSize() unexpected error = %v for file %s", err, tt.filePath)
+				}
+			}
+		})
+	}
+}
+
 func TestValidateFilePath(t *testing.T) {
 	// Get current working directory for testing
 	cwd, err := os.Getwd()
